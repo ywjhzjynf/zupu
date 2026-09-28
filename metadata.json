@@ -1,0 +1,6 @@
+{
+  "name": "数字族谱 - 传承家族记忆",
+  "description": "现代化多代数字族谱系统，支持可视化世系图谱、家庭关系网络、字辈辈分、家族记忆库、族谱相册及AI族谱助手。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
