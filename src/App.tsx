@@ -73,6 +73,8 @@ export default function App() {
       const activeFamId = userRes.user.currentFamilyId || famsRes.families[0]?.id;
       if (activeFamId) {
         await loadFamilySpace(activeFamId);
+      } else if (famsRes.families.length > 0) {
+        await loadFamilySpace(famsRes.families[0].id);
       }
     } catch (err) {
       console.error('Failed to load genealogy app data:', err);
@@ -161,8 +163,19 @@ export default function App() {
   };
 
   const handleAskAI = async (question: string) => {
-    if (!currentFamily) return '暂未选择家族空间';
-    const res = await api.askAI(currentFamily.id, question, user?.boundMemberId);
+    let famId = currentFamily?.id;
+    if (!famId && families.length > 0) {
+      famId = families[0].id;
+      await loadFamilySpace(famId);
+    }
+    if (!famId) {
+      const res = await api.createFamily({ name: '陇西李氏家族', surname: '李', hallName: '陇西堂' });
+      famId = res.family.id;
+      const famsRes = await api.getFamilies();
+      setFamilies(famsRes.families);
+      await loadFamilySpace(famId);
+    }
+    const res = await api.askAI(famId, question, user?.boundMemberId);
     return res.answer;
   };
 
