@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { Header } from './components/common/Header';
 import { TabBar, TabType } from './components/common/TabBar';
 import { FamilySwitchModal } from './components/common/FamilySwitchModal';
@@ -427,6 +428,7 @@ export default function App() {
           setUser(loggedInUser);
         }}
       />
+      <Analytics />
     </div>
   );
 }
