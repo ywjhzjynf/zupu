@@ -62,16 +62,39 @@ export const PhotoUploadModal: React.FC<PhotoUploadModalProps> = ({ isOpen, onCl
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
           <div>
-            <label className="block font-semibold mb-1">图片链接 * (也可点击下方快捷示例)</label>
-            <input
-              type="url"
-              required
-              placeholder="https://..."
-              value={photoUrl}
-              onChange={(e) => setPhotoUrl(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-[#D9CDB8] bg-white focus:outline-none focus:border-[#8B5A2B]"
-            />
-            <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+            <label className="block font-semibold mb-1">图片来源 * (选择本地照片/拍照，或输入网络链接)</label>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                required
+                placeholder="图片 URL 或上传本地图片..."
+                value={photoUrl}
+                onChange={(e) => setPhotoUrl(e.target.value)}
+                className="flex-1 px-3 py-2 rounded-xl border border-[#D9CDB8] bg-white focus:outline-none focus:border-[#8B5A2B]"
+              />
+              <label className="bg-[#8B5A2B] hover:bg-[#663F1A] text-white px-3 py-2 rounded-xl font-semibold cursor-pointer flex items-center gap-1 shrink-0">
+                <Upload className="w-4 h-4" />
+                <span>拍照/选图</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (evt) => {
+                        if (evt.target?.result) {
+                          setPhotoUrl(evt.target.result as string);
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
               {samplePhotos.map((url, i) => (
                 <img
                   key={i}

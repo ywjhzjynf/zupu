@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, UserPlus, Filter, BookBookmark, MapPin, Calendar, Award } from 'lucide-react';
+import { Search, UserPlus, Filter, BookBookmark, MapPin, Calendar, Award, Wand2 } from 'lucide-react';
 import { FamilyMember, GenerationOrder } from '../types/genealogy';
 
 interface DirectoryViewProps {
@@ -7,6 +7,7 @@ interface DirectoryViewProps {
   generationOrders: GenerationOrder[];
   onSelectMember: (member: FamilyMember) => void;
   onOpenAddMember: () => void;
+  onOpenAIBatch?: () => void;
 }
 
 export const DirectoryView: React.FC<DirectoryViewProps> = ({
@@ -14,6 +15,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
   generationOrders,
   onSelectMember,
   onOpenAddMember,
+  onOpenAIBatch,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGenTab, setActiveGenTab] = useState<number | 'all'>('all');
@@ -70,11 +72,21 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
           />
         </div>
 
+        {onOpenAIBatch && (
+          <button
+            onClick={onOpenAIBatch}
+            className="bg-gradient-to-r from-[#8B5A2B] to-[#663F1A] text-white text-xs font-semibold px-3 py-2.5 rounded-2xl shadow-xs transition-all flex items-center gap-1 shrink-0 ring-1 ring-[#D4A359]/40"
+          >
+            <Wand2 className="w-3.5 h-3.5 text-amber-300" />
+            <span>AI 口述建谱</span>
+          </button>
+        )}
+
         <button
           onClick={onOpenAddMember}
-          className="bg-[#8B5A2B] hover:bg-[#663F1A] text-white text-xs font-semibold px-4 py-2.5 rounded-2xl shadow-xs transition-all flex items-center gap-1 shrink-0"
+          className="bg-[#8B5A2B] hover:bg-[#663F1A] text-white text-xs font-semibold px-3 py-2.5 rounded-2xl shadow-xs transition-all flex items-center gap-1 shrink-0"
         >
-          <UserPlus className="w-4 h-4" />
+          <UserPlus className="w-3.5 h-3.5" />
           <span>加成员</span>
         </button>
       </div>

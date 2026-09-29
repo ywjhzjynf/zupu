@@ -11,8 +11,10 @@ import {
   Award,
   ArrowRight,
   ChevronRight,
+  Wand2,
 } from 'lucide-react';
 import { Family, FamilyMember, FamilyPhoto, FamilyStory } from '../types/genealogy';
+import { FamilyMemorialSection } from '../components/home/FamilyMemorialSection';
 
 interface HomeViewProps {
   family: Family | null;
@@ -22,6 +24,7 @@ interface HomeViewProps {
   boundMember: FamilyMember | null;
   onNavigateTab: (tab: 'tree' | 'directory' | 'stories' | 'profile') => void;
   onOpenAddMember: () => void;
+  onOpenAIBatch: () => void;
   onSelectMember: (member: FamilyMember) => void;
   onSelectStory: (story: FamilyStory) => void;
   onSelectPhoto: (photo: FamilyPhoto) => void;
@@ -36,6 +39,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   boundMember,
   onNavigateTab,
   onOpenAddMember,
+  onOpenAIBatch,
   onSelectMember,
   onSelectStory,
   onSelectPhoto,
@@ -92,37 +96,53 @@ export const HomeView: React.FC<HomeViewProps> = ({
       </div>
 
       {/* Quick Action Entry Buttons */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <button
           onClick={() => onNavigateTab('tree')}
-          className="bg-white p-4 rounded-2xl border border-[#E8DFD1] shadow-xs hover:shadow-md transition-all flex items-center justify-between group active:scale-98"
+          className="bg-white p-3.5 rounded-2xl border border-[#E8DFD1] shadow-xs hover:shadow-md transition-all flex items-center justify-between group active:scale-98"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#8B5A2B]/10 text-[#8B5A2B] flex items-center justify-center font-bold">
-              <GitFork className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl bg-[#8B5A2B]/10 text-[#8B5A2B] flex items-center justify-center font-bold shrink-0">
+              <GitFork className="w-4 h-4" />
             </div>
             <div className="text-left">
-              <span className="font-bold font-serif text-sm text-[#1A1A1A] block">全景族谱图</span>
-              <span className="text-[11px] text-[#8B5A2B]">世系拓扑漫游</span>
+              <span className="font-bold font-serif text-xs text-[#1A1A1A] block">全景族谱图</span>
+              <span className="text-[10px] text-[#8B5A2B]">世系拓扑漫游</span>
             </div>
           </div>
-          <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-[#8B5A2B] group-hover:translate-x-1 transition-all" />
+          <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#8B5A2B] group-hover:translate-x-1 transition-all" />
+        </button>
+
+        <button
+          onClick={onOpenAIBatch}
+          className="bg-gradient-to-r from-[#8B5A2B] to-[#663F1A] text-white p-3.5 rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center justify-between group active:scale-98 ring-2 ring-[#D4A359]/40"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center font-bold shrink-0">
+              <Wand2 className="w-4 h-4 text-amber-300" />
+            </div>
+            <div className="text-left">
+              <span className="font-bold font-serif text-xs block text-amber-200">✨ AI 口述建谱</span>
+              <span className="text-[10px] text-white/80">免打字一键生成</span>
+            </div>
+          </div>
+          <ArrowRight className="w-3.5 h-3.5 text-white/80 group-hover:translate-x-1 transition-all" />
         </button>
 
         <button
           onClick={onOpenAddMember}
-          className="bg-gradient-to-r from-[#B83B26] to-[#8B5A2B] text-white p-4 rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center justify-between group active:scale-98"
+          className="bg-white p-3.5 rounded-2xl border border-[#E8DFD1] hover:border-[#8B5A2B] shadow-xs hover:shadow-md transition-all flex items-center justify-between group active:scale-98"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-bold">
-              <UserPlus className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl bg-[#B83B26]/10 text-[#B83B26] flex items-center justify-center font-bold shrink-0">
+              <UserPlus className="w-4 h-4" />
             </div>
             <div className="text-left">
-              <span className="font-bold font-serif text-sm block">添加家人</span>
-              <span className="text-[11px] text-white/80">修撰补全成员</span>
+              <span className="font-bold font-serif text-xs text-[#1A1A1A] block">手动添加家人</span>
+              <span className="text-[10px] text-gray-500">表单精准建档</span>
             </div>
           </div>
-          <ArrowRight className="w-4 h-4 text-white/80 group-hover:translate-x-1 transition-all" />
+          <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#B83B26] group-hover:translate-x-1 transition-all" />
         </button>
       </div>
 
@@ -142,6 +162,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </div>
         <span className="text-xs bg-[#8B5A2B] text-white px-3 py-1.5 rounded-xl font-medium">即刻提问</span>
       </div>
+
+      {/* Family Memorial & Reminders Section */}
+      <FamilyMemorialSection members={members} onSelectMember={onSelectMember} />
 
       {/* Ancestor / Core Members Highlight Section */}
       <div className="space-y-3">

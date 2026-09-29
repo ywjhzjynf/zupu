@@ -107,10 +107,25 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  // AI Assistant
+  // AI Assistant & Smart Parsing
   askAI: (familyId: string, question: string, fromMemberId?: string) =>
     fetchJson<{ success: boolean; answer: string }>('/api/ai/ask', {
       method: 'POST',
       body: JSON.stringify({ familyId, question, fromMemberId }),
+    }),
+  parseAIText: (text: string) =>
+    fetchJson<{ success: boolean; members: any[] }>('/api/ai/parse-text', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+  uploadImage: (imageBase64: string) =>
+    fetchJson<{ success: boolean; url: string }>('/api/upload', {
+      method: 'POST',
+      body: JSON.stringify({ imageBase64 }),
+    }),
+  parseAIPhoto: (imageBase64: string) =>
+    fetchJson<{ success: boolean; text: string; members: any[] }>('/api/ai/parse-photo', {
+      method: 'POST',
+      body: JSON.stringify({ imageBase64 }),
     }),
 };

@@ -287,17 +287,25 @@ export const ExportGenealogyModal: React.FC<ExportGenealogyModalProps> = ({
               {/* Printable Genealogy Preview Box */}
               <div
                 id="printable-genealogy"
-                className="bg-[#FDFBF7] p-8 border-2 border-[#8B5A2B] rounded-2xl shadow-inner font-serif space-y-6 text-[#1A1A1A]"
+                className="bg-[#FDFBF7] p-8 border-4 border-double border-[#8B5A2B] rounded-2xl shadow-inner font-serif space-y-6 text-[#1A1A1A] relative"
               >
+                {/* Vintage Corner Decoration Stamps */}
+                <div className="absolute top-4 left-4 w-12 h-12 border-2 border-[#B83B26] text-[#B83B26] rounded-full flex items-center justify-center text-[10px] font-bold rotate-[-12deg] bg-red-50/40 pointer-events-none">
+                  {family.hallName || '陇西堂'}
+                </div>
+                <div className="absolute top-4 right-4 w-12 h-12 border-2 border-[#8B5A2B] text-[#8B5A2B] rounded-md flex items-center justify-center text-[10px] font-bold rotate-[15deg] bg-amber-50/40 pointer-events-none">
+                  万代千秋
+                </div>
+
                 {/* Title Header */}
-                <div className="text-center border-b-2 border-[#8B5A2B] pb-4">
-                  <span className="seal-badge text-[#B83B26] border-[#B83B26] text-xs mb-2">
-                    {family.hallName || '陇西堂'}
+                <div className="text-center border-b-2 border-[#8B5A2B] pb-5 pt-2">
+                  <span className="inline-block px-3 py-1 bg-[#B83B26] text-white text-xs font-bold rounded-md tracking-widest mb-2 shadow-xs">
+                    {family.hallName ? `${family.hallName}世谱` : '陇西堂宗谱'}
                   </span>
-                  <h1 className="text-2xl font-bold font-serif tracking-widest text-[#1A1A1A] my-2">
+                  <h1 className="text-3xl font-bold font-serif tracking-widest text-[#1A1A1A] my-2">
                     《{family.name}》
                   </h1>
-                  <p className="text-xs text-[#8B5A2B]">
+                  <p className="text-xs text-[#8B5A2B] font-serif">
                     始祖祖籍：{family.ancestralHome || '中国'} · 全家族共记 {members.length} 人 · 世传 {maxGen} 代
                   </p>
                 </div>
@@ -311,25 +319,27 @@ export const ExportGenealogyModal: React.FC<ExportGenealogyModalProps> = ({
                       const genCharObj = generationOrders.find((g) => g.generationNum === genNum);
 
                       return (
-                        <div key={genNum} className="border border-[#D9CDB8] rounded-xl p-3 bg-white">
-                          <div className="flex items-center justify-between border-b border-[#E8DFD1] pb-1.5 mb-2 font-bold text-xs text-[#8B5A2B]">
-                            <span>
-                              第 {genNum} 世 {genCharObj ? `· [${genCharObj.character}]字辈` : ''}
+                        <div key={genNum} className="border-2 border-[#D9CDB8] rounded-xl p-4 bg-white/90 shadow-xs">
+                          <div className="flex items-center justify-between border-b-2 border-[#E8DFD1] pb-2 mb-3 font-bold text-xs text-[#8B5A2B]">
+                            <span className="text-sm font-serif">
+                              第 {genNum} 世 {genCharObj ? `· [${genCharObj.character}] 字辈` : ''}
                             </span>
-                            <span className="text-[10px] text-gray-400">本世共 {genMembers.length} 位宗亲</span>
+                            <span className="text-[10px] bg-[#FDFBF7] px-2.5 py-0.5 rounded-full border border-[#D9CDB8]">
+                              本世共 {genMembers.length} 位宗亲
+                            </span>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
                             {genMembers.map((m) => (
-                              <div key={m.id} className="p-2 bg-[#FDFBF7] rounded-lg border border-[#E8DFD1]">
-                                <div className="font-bold text-[#1A1A1A] flex items-center justify-between">
+                              <div key={m.id} className="p-3 bg-[#FDFBF7] rounded-xl border border-[#E8DFD1] space-y-1">
+                                <div className="font-bold text-[#1A1A1A] text-xs flex items-center justify-between">
                                   <span>{m.name}</span>
-                                  <span className="text-[10px] text-gray-500 font-normal">
-                                    {m.gender === 'male' ? '男' : '女'} · {m.isDeceased ? '已故' : '健在'}
+                                  <span className="text-[10px] text-[#8B5A2B] font-normal">
+                                    {m.gender === 'male' ? '男' : '女'} · {m.isDeceased ? '故去' : '健在'}
                                   </span>
                                 </div>
-                                <p className="text-[10px] text-[#666666] mt-1 leading-relaxed">
-                                  {m.biography || '生平记载祥和完备。'}
+                                <p className="text-[10px] text-[#555555] leading-relaxed">
+                                  {m.biography || '生平记述祥和完备。'}
                                 </p>
                               </div>
                             ))}
@@ -342,10 +352,10 @@ export const ExportGenealogyModal: React.FC<ExportGenealogyModalProps> = ({
 
                 {/* Render Ou-style Chart */}
                 {styleMode === 'ou_style' && (
-                  <div className="space-y-3 divide-y divide-[#E8DFD1]">
+                  <div className="space-y-3 divide-y-2 divide-[#E8DFD1]">
                     {members.map((m) => (
-                      <div key={m.id} className="pt-2 flex items-start justify-between text-xs">
-                        <div className="font-bold text-[#8B5A2B] w-20">第 {m.generationNum} 世</div>
+                      <div key={m.id} className="pt-3 flex items-start justify-between text-xs font-serif">
+                        <div className="font-bold text-[#8B5A2B] w-24">第 {m.generationNum} 世</div>
                         <div className="flex-1 font-bold text-[#1A1A1A]">{m.name}</div>
                         <div className="flex-1 text-[#666666]">{m.livingPlace || m.birthPlace || '住址未记'}</div>
                         <div className="flex-1 text-[#8B5A2B]">{m.occupation || '功名未记'}</div>
@@ -353,6 +363,10 @@ export const ExportGenealogyModal: React.FC<ExportGenealogyModalProps> = ({
                     ))}
                   </div>
                 )}
+
+                <div className="text-center pt-4 border-t border-[#D9CDB8] text-[10px] text-gray-400 font-serif">
+                  —— 数字化修谱系统 宣纸风高保真卷轴 ——
+                </div>
               </div>
             </div>
           )}

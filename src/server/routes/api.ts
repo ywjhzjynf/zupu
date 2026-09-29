@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/database';
 import { calculateKinshipTitle } from '../services/kinship';
-import { askAIGenealogyAssistant } from '../services/aiGenealogy';
+import { askAIGenealogyAssistant, parseAIGenealogyText, parseAIGenealogyPhoto } from '../services/aiGenealogy';
 import { FamilyMember, ParentChildRelation, SpouseRelation } from '../../types/genealogy';
 
 export const apiRouter = Router();
@@ -182,7 +182,7 @@ apiRouter.get('/families/:id/members', (req: Request, res: Response) => {
 
 apiRouter.post('/families/:id/members', (req: Request, res: Response) => {
   const familyId = req.params.id;
-  const {
+  let {
     name,
     usedName,
     gender,
@@ -199,18 +199,51 @@ apiRouter.post('/families/:id/members', (req: Request, res: Response) => {
     biography,
     avatarUrl,
     privacyLevel,
-    parentId, // Optional parent link
-    spouseId, // Optional spouse link
+    parentId, // Optional parent ID
+    spouseId, // Optional spouse ID
+    parentName, // Optional parent Name for auto-linking
+    spouseName, // Optional spouse Name for auto-linking
   } = req.body;
 
+  // 1. Check for Duplicate Member in same family (Auto Deduplication & Merge)
+  const existingMember = db.familyMembers.find(
+    (m) => m.familyId === familyId && m.name === name?.trim()
+  );
+
+  if (existingMember) {
+    // Enrich existing member profile rather than creating duplicate
+    existingMember.biography =
+      existingMember.biography + (biography ? `\n[补充记载] ${biography}` : '');
+    if (birthDate && !existingMember.birthDate) existingMember.birthDate = birthDate;
+    if (deathDate && !existingMember.deathDate) existingMember.deathDate = deathDate;
+    if (livingPlace && !existingMember.livingPlace) existingMember.livingPlace = livingPlace;
+    if (occupation && !existingMember.occupation) existingMember.occupation = occupation;
+
+    res.json({ success: true, member: existingMember, merged: true });
+    return;
+  }
+
+  // 2. Auto match generation number and character from Family Generation Orders
+  const genOrders = db.generationOrders.filter((g) => g.familyId === familyId);
+  if ((!generationNum || Number(generationNum) === 1) && name) {
+    for (const go of genOrders) {
+      if (name.includes(go.character)) {
+        generationNum = go.generationNum;
+        generationChar = go.character;
+        break;
+      }
+    }
+  }
+
+  // 3. Create New Member
   const newMember: FamilyMember = {
-    id: `mem_${Date.now()}`,
+    id: `mem_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
     familyId,
-    name,
+    name: name?.trim() || '新宗亲',
     usedName,
     gender: gender || 'male',
-    generationNum: Number(generationNum) || 1,
-    generationChar,
+    generationNum: Number(generationNum) || 3,
+    generationChar: generationChar || '',
     birthDate,
     isDeceased: Boolean(isDeceased),
     deathDate,
@@ -231,11 +264,22 @@ apiRouter.post('/families/:id/members', (req: Request, res: Response) => {
 
   db.familyMembers.push(newMember);
 
-  if (parentId) {
+  // 4. Auto-Link Parent Relation by ID or Name
+  let finalParentId = parentId;
+  if (!finalParentId && parentName) {
+    const parentMatch = db.familyMembers.find(
+      (m) => m.familyId === familyId && m.name === parentName.trim()
+    );
+    if (parentMatch) {
+      finalParentId = parentMatch.id;
+    }
+  }
+
+  if (finalParentId) {
     const pcRelation: ParentChildRelation = {
-      id: `pc_${Date.now()}`,
+      id: `pc_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       familyId,
-      parentId,
+      parentId: finalParentId,
       childId: newMember.id,
       relationType: 'biological',
       createdAt: new Date().toISOString(),
@@ -243,11 +287,22 @@ apiRouter.post('/families/:id/members', (req: Request, res: Response) => {
     db.parentChildRelations.push(pcRelation);
   }
 
-  if (spouseId) {
+  // 5. Auto-Link Spouse Relation by ID or Name
+  let finalSpouseId = spouseId;
+  if (!finalSpouseId && spouseName) {
+    const spouseMatch = db.familyMembers.find(
+      (m) => m.familyId === familyId && m.name === spouseName.trim()
+    );
+    if (spouseMatch) {
+      finalSpouseId = spouseMatch.id;
+    }
+  }
+
+  if (finalSpouseId) {
     const spRelation: SpouseRelation = {
-      id: `sp_${Date.now()}`,
+      id: `sp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       familyId,
-      memberAId: spouseId,
+      memberAId: finalSpouseId,
       memberBId: newMember.id,
       marriageType: 'first_marriage',
       marriageOrder: 1,
@@ -389,5 +444,46 @@ apiRouter.post('/ai/ask', async (req: Request, res: Response) => {
     res.json({ success: true, answer });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message || 'AI 助手服务暂时不可用' });
+  }
+});
+
+// 10. AI Smart Text Parsing Endpoint
+apiRouter.post('/ai/parse-text', async (req: Request, res: Response) => {
+  try {
+    const { text } = req.body;
+    const members = await parseAIGenealogyText(text || '');
+    res.json({ success: true, members });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message || 'AI 解析失败' });
+  }
+});
+
+// 11. Image Upload Endpoint (Handles base64/data URLs)
+apiRouter.post('/upload', (req: Request, res: Response) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64) {
+      res.status(400).json({ success: false, message: '无效的图片数据' });
+      return;
+    }
+    // Return data URL directly or hosted resource URL
+    res.json({ success: true, url: imageBase64 });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: '图片上传处理失败' });
+  }
+});
+
+// 12. AI Photo Multimodal OCR Endpoint
+apiRouter.post('/ai/parse-photo', async (req: Request, res: Response) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64) {
+      res.status(400).json({ success: false, message: '请选择要识别的族谱/老照片文件' });
+      return;
+    }
+    const result = await parseAIGenealogyPhoto(imageBase64);
+    res.json({ success: true, text: result.text, members: result.members });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message || '图片 OCR 识谱失败' });
   }
 });

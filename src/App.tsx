@@ -12,6 +12,7 @@ import { PhotoDetailModal } from './components/photo/PhotoDetailModal';
 import { PhotoUploadModal } from './components/photo/PhotoUploadModal';
 import { AIAssistantDrawer } from './components/ai/AIAssistantDrawer';
 import { ExportGenealogyModal } from './components/export/ExportGenealogyModal';
+import { AIBatchEntryModal } from './components/member/AIBatchEntryModal';
 
 import { HomeView } from './views/HomeView';
 import { GenealogyView } from './views/GenealogyView';
@@ -46,6 +47,7 @@ export default function App() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isAIBatchOpen, setIsAIBatchOpen] = useState(false);
 
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
   const [memberToEdit, setMemberToEdit] = useState<FamilyMember | null>(null);
@@ -217,6 +219,7 @@ export default function App() {
               setSpousePreset(null);
               setIsMemberEditOpen(true);
             }}
+            onOpenAIBatch={() => setIsAIBatchOpen(true)}
             onSelectMember={setSelectedMember}
             onSelectStory={setSelectedStory}
             onSelectPhoto={setSelectedPhoto}
@@ -256,6 +259,7 @@ export default function App() {
               setSpousePreset(null);
               setIsMemberEditOpen(true);
             }}
+            onOpenAIBatch={() => setIsAIBatchOpen(true)}
           />
         )}
 
@@ -391,6 +395,13 @@ export default function App() {
         members={members}
         generationOrders={generationOrders}
         onImportMembers={handleImportMembers}
+      />
+
+      <AIBatchEntryModal
+        isOpen={isAIBatchOpen}
+        onClose={() => setIsAIBatchOpen(false)}
+        familyId={currentFamily?.id || ''}
+        onBatchImportDone={() => loadFamilySpace(currentFamily?.id || '')}
       />
     </div>
   );
