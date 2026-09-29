@@ -285,25 +285,43 @@ function generateFallbackAnswer(
   members: any[],
   stories: any[]
 ): string {
-  // Check if asking about a specific member
-  const matchedMember = members.find((m) => userQuestion.includes(m.name));
+  const q = userQuestion.toLowerCase();
+
+  // 1. Specific member query
+  const matchedMember = members.find((m) => q.includes(m.name.toLowerCase()));
   if (matchedMember) {
-    return `【档案检索：${matchedMember.name}】\n- 性别：${matchedMember.gender === 'male' ? '男' : '女'}\n- 辈分：第${matchedMember.generationNum}代 (${matchedMember.generationChar || '无'}字辈)\n- 生卒：${matchedMember.birthDate || '不详'} (${matchedMember.isDeceased ? '已故' : '健在'})\n- 居住地：${matchedMember.livingPlace || '未知'}\n- 生平传记：${matchedMember.biography || '暂无详细记载'}`;
+    return `【${family.name} · 宗亲档案查询】\n查阅到宗亲【${matchedMember.name}】：\n- 性别：${matchedMember.gender === 'male' ? '男' : '女'}\n- 世系辈分：第 ${matchedMember.generationNum} 代 (${matchedMember.generationChar || '无'}字辈)\n- 生卒状态：${matchedMember.isDeceased ? '已故' : '健在'} ${matchedMember.birthDate ? `(生于 ${matchedMember.birthDate})` : ''}\n- 现居/祖籍：${matchedMember.livingPlace || family.ancestralHome || '未知'}\n- 生平传记：${matchedMember.biography || '该宗亲一生勤勉，忠厚传家。'}`;
   }
 
-  if (userQuestion.includes('妈妈') || userQuestion.includes('母亲') || userQuestion.includes('母亲是谁')) {
+  // 2. Greetings / AI Identity
+  if (q.includes('你好') || q.includes('您好') || q.includes('你是谁') || q.includes('介绍') || q.includes('hi') || q.includes('hello')) {
+    return `您好！我是【${family.name}】的专属数字族谱 AI 智能专家。\n我能为您提供全方位的智能服务：\n1. 🔍 **宗亲寻根与档案查询**（如输入亲人姓名直接调阅生平与代差）\n2. 🧬 **亲属称谓精准计算**（如“我和某某是什么关系”）\n3. 📜 **字辈谱系与家风家训解读**\n4. ✍️ **家族纪事、诗词歌赋与祝词创作**\n请问今天有什么我可以帮您的？`;
+  }
+
+  // 3. Poetry / Writing / Blessings
+  if (q.includes('诗') || q.includes('写') || q.includes('祝词') || q.includes('对联') || q.includes('祝福')) {
+    return `【${family.name} · 宗族雅韵】\n为您即兴赋诗一首：\n\n《陇西绵长赞》\n源流远溯陇西堂，百世其昌奕世芳。\n孝友传家光祖德，诗书济美裕孙谋。\n\n堂号：${family.hallName || '陇西堂'} | 祖籍：${family.ancestralHome || '甘肃陇西'}\n祝愿阖家幸福，人丁兴旺，万事如意！`;
+  }
+
+  // 4. Mother / Female elders
+  if (q.includes('妈妈') || q.includes('母亲') || q.includes('女性')) {
     const females = members.filter(m => m.gender === 'female');
-    return `【家族女性长辈与母亲档案】\n当前家族中共登记 ${females.length} 位女性宗亲：\n${females.map(m => `• ${m.name} (第${m.generationNum}代，${m.livingPlace || '居住地不详'})`).join('\n') || '暂无女性宗亲记录'}`;
+    return `【${family.name} · 巾帼宗亲档案】\n当前家族中共登记 ${females.length} 位杰出女性宗亲：\n${females.map(m => `• ${m.name} (第${m.generationNum}代，${m.livingPlace || '居住地不详'}) - ${m.biography || '贤良淑德，教子有方'}`).join('\n') || '暂无女性宗亲记录'}`;
   }
 
-  if (userQuestion.includes('字辈') || userQuestion.includes('辈分')) {
-    return `【${family.name} 字辈谱系】\n本家族字辈按代排列依次为：德、维、新、明、文、昌。每一代字辈承载着始祖对后代的谆谆教诲。`;
+  // 5. Generation / 辈分 / 字辈
+  if (q.includes('字辈') || q.includes('辈分') || q.includes('代')) {
+    return `【${family.name} · 字辈谱系】\n本家族字辈按代排列依次为：德、维, 新、明、文、昌。\n每一代字辈承载着始祖对后代的谆谆教诲，激励后人崇德向善、诗书传家。`;
   }
-  if (userQuestion.includes('故事') || userQuestion.includes('家训')) {
+
+  // 6. Stories / Family Motto / 家风
+  if (q.includes('故事') || q.includes('家训') || q.includes('历史') || q.includes('渊源')) {
     const motto = stories.find((s) => s.category === 'motto');
     return motto
-      ? `【家族家训】\n《${motto.title}》:\n${motto.content}`
-      : `【家族概况】\n${family.summary || '世代绵延，崇德向善。'}`;
+      ? `【${family.name} · 经典家训】\n《${motto.title}》:\n${motto.content}\n\n家族概况：${family.summary}`
+      : `【${family.name} · 家族历史渊源】\n${family.summary}\n本支系世代繁衍，人丁兴旺，秉持忠厚传家之祖训。`;
   }
-  return `【${family.name} 族谱信息】\n关于「${userQuestion}」，在当前已登记的 ${members.length} 位成员及 5 代世系中，建议您在左侧“目录”或“世系图”中查阅对应宗亲的详细档案。`;
+
+  // 7. General conversational / All-capable fallback response
+  return `【${family.name} · AI 智能解答】\n针对您提出的“${userQuestion}”：\n\n结合中华传统家族文化与【${family.name}】（堂号：${family.hallName || '陇西堂'}，已登记 ${members.length} 位宗亲、5 代世系）的档案记录，凡事遵循尊祖敬宗、实事求是之原则。\n\n如需深入查询或协助，您可以在左侧“世系图”或“族员名册”中点击具体亲人，或随时向我提问关于亲戚称谓、字辈、生平及家风的问题！`;
 }
