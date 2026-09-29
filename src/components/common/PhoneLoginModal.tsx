@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { X, Smartphone, MessageSquare, ShieldCheck, QrCode, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Smartphone, QrCode, CheckCircle2, AlertTriangle, ShieldCheck, KeyRound } from 'lucide-react';
+import { api, saveStoredToken } from '../../api/client';
 
 interface PhoneLoginModalProps {
   isOpen: boolean;
@@ -12,70 +13,137 @@ export const PhoneLoginModal: React.FC<PhoneLoginModalProps> = ({
   onClose,
   onLoginSuccess,
 }) => {
-  const [loginMode, setLoginMode] = useState<'phone' | 'wechat'>('phone');
-  const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
-  const [step, setStep] = useState<'input' | 'success'>('input');
-  const [countdown, setCountdown] = useState(0);
+  const [loginMode, setLoginMode] = useState<'wechat' | 'phone'>('wechat');
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [step, setStep] = useState<'login' | 'success'>('login');
+  
+  // Custom manual input state for web testing real WeChat code
+  const [wxCode, setWxCode] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [currentOpenId, setCurrentOpenId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setErrorMsg(null);
+      setStep('login');
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSendCode = () => {
-    if (!phone || phone.length < 11) {
-      alert('请输入正确的11位手机号码');
-      return;
-    }
-    setCountdown(60);
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
+  // 1. Silent WeChat Login via wx.login()
+  const handleNativeWxLogin = async () => {
+    setErrorMsg(null);
+    setLoading(true);
+
+    const isWxEnv = typeof (window as any).wx !== 'undefined' && typeof (window as any).wx.login === 'function';
+
+    if (isWxEnv) {
+      (window as any).wx.login({
+        success: async (res: any) => {
+          if (res.code) {
+            try {
+              const data = await api.wechatLogin(res.code);
+              saveStoredToken(data.token);
+              setCurrentOpenId(data.openid);
+              setStep('success');
+              setTimeout(() => {
+                onLoginSuccess(data.user);
+                onClose();
+              }, 1000);
+            } catch (err: any) {
+              setErrorMsg(err.message || '微信静默登录处理异常');
+            } finally {
+              setLoading(false);
+            }
+          } else {
+            setLoading(false);
+            setErrorMsg('微信 wx.login 未能获取到有效的 code 凭证');
+          }
+        },
+        fail: (err: any) => {
+          setLoading(false);
+          setErrorMsg(`微信小程序 wx.login 接口调用失败: ${err?.errMsg || '用户取消授权'}`);
+        },
       });
-    }, 1000);
-    alert('验证码已发送 (测试验证码: 8888)');
+    } else {
+      // In web/h5 environment, submit the user's WeChat login code
+      if (!wxCode.trim()) {
+        setLoading(false);
+        setErrorMsg('网页开发环境中，请输入微信小程序得到的真实 wx.login() code 提交至后端请求');
+        return;
+      }
+      try {
+        const data = await api.wechatLogin(wxCode.trim());
+        saveStoredToken(data.token);
+        setCurrentOpenId(data.openid);
+        setStep('success');
+        setTimeout(() => {
+          onLoginSuccess(data.user);
+          onClose();
+        }, 1000);
+      } catch (err: any) {
+        setErrorMsg(err.message || '微信静默登录失败');
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  // 2. Real Phone Number Authorization via WeChat <button open-type="getPhoneNumber">
+  const handleGetPhoneNumber = async (e: any) => {
+    setErrorMsg(null);
+    setLoading(true);
+
+    const detail = e?.detail || {};
+    const codeFromWx = detail.code;
+
+    if (!codeFromWx) {
+      setLoading(false);
+      if (detail.errMsg && detail.errMsg.includes('deny')) {
+        setErrorMsg('您拒绝了手机号快捷授权');
+      } else {
+        setErrorMsg('未获取到微信手机号授权 code 凭证 (网页环境请在下面输入框粘贴真实 getPhoneNumber code 测试)');
+      }
+      return;
+    }
+
+    try {
+      const data = await api.wechatGetPhone(codeFromWx, currentOpenId || undefined);
+      setStep('success');
+      setTimeout(() => {
+        onLoginSuccess(data.user);
+        onClose();
+      }, 1000);
+    } catch (err: any) {
+      setErrorMsg(err.message || '微信手机号解密验证失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Web Manual Phone Code Authorization Submission
+  const handleWebPhoneCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone) {
-      alert('请输入手机号');
+    if (!phoneCode.trim()) {
+      setErrorMsg('请输入微信 getPhoneNumber 事件返回的真实 phoneCode');
       return;
     }
-    if (loginMode === 'phone' && code !== '8888' && code !== '1234') {
-      alert('请输入正确的验证码 (测试验证码: 8888)');
-      return;
+    setErrorMsg(null);
+    setLoading(true);
+    try {
+      const data = await api.wechatGetPhone(phoneCode.trim(), currentOpenId || undefined);
+      setStep('success');
+      setTimeout(() => {
+        onLoginSuccess(data.user);
+        onClose();
+      }, 1000);
+    } catch (err: any) {
+      setErrorMsg(err.message || '微信手机号获取失败');
+    } finally {
+      setLoading(false);
     }
-
-    setStep('success');
-    setTimeout(() => {
-      onLoginSuccess({
-        id: `usr_${Date.now()}`,
-        nickname: phone ? `手机用户_${phone.slice(-4)}` : '微信贵宾',
-        phone: phone || '13800138000',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-        currentFamilyId: 'fam_1',
-      });
-      setStep('input');
-      onClose();
-    }, 1000);
-  };
-
-  const handleWeChatSimulate = () => {
-    setStep('success');
-    setTimeout(() => {
-      onLoginSuccess({
-        id: `usr_wx_${Date.now()}`,
-        nickname: '微信授权宗亲',
-        phone: '13912345678',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
-        currentFamilyId: 'fam_1',
-      });
-      setStep('input');
-      onClose();
-    }, 1000);
   };
 
   return (
@@ -84,8 +152,8 @@ export const PhoneLoginModal: React.FC<PhoneLoginModalProps> = ({
         {/* Header */}
         <div className="bg-gradient-to-r from-[#8B5A2B] to-[#B83B26] text-white p-5 flex items-center justify-between">
           <div>
-            <h2 className="font-serif font-bold text-lg">数字族谱·登录中心</h2>
-            <p className="text-xs text-white/80 mt-0.5">手机号与微信一键快捷登录</p>
+            <h2 className="font-serif font-bold text-lg">数字族谱·微信官方授权中心</h2>
+            <p className="text-xs text-white/80 mt-0.5">微信静默登录与手机号组件授权</p>
           </div>
           <button onClick={onClose} className="text-white/80 hover:text-white p-1 rounded-full">
             <X className="w-5 h-5" />
@@ -96,19 +164,10 @@ export const PhoneLoginModal: React.FC<PhoneLoginModalProps> = ({
         <div className="flex border-b border-[#E8DFD1] bg-white">
           <button
             type="button"
-            onClick={() => setLoginMode('phone')}
-            className={`flex-1 py-3 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
-              loginMode === 'phone'
-                ? 'text-[#8B5A2B] border-b-2 border-[#8B5A2B] bg-[#8B5A2B]/5 font-bold'
-                : 'text-gray-500 hover:text-[#1A1A1A]'
-            }`}
-          >
-            <Smartphone className="w-4 h-4" />
-            <span>手机号快捷登录</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setLoginMode('wechat')}
+            onClick={() => {
+              setLoginMode('wechat');
+              setErrorMsg(null);
+            }}
             className={`flex-1 py-3 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
               loginMode === 'wechat'
                 ? 'text-[#07C160] border-b-2 border-[#07C160] bg-[#07C160]/5 font-bold'
@@ -116,91 +175,139 @@ export const PhoneLoginModal: React.FC<PhoneLoginModalProps> = ({
             }`}
           >
             <QrCode className="w-4 h-4" />
-            <span>微信授权登录</span>
+            <span>微信静默登录 (wx.login)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLoginMode('phone');
+              setErrorMsg(null);
+            }}
+            className={`flex-1 py-3 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+              loginMode === 'phone'
+                ? 'text-[#8B5A2B] border-b-2 border-[#8B5A2B] bg-[#8B5A2B]/5 font-bold'
+                : 'text-gray-500 hover:text-[#1A1A1A]'
+            }`}
+          >
+            <Smartphone className="w-4 h-4" />
+            <span>手机号组件授权 (getPhoneNumber)</span>
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-6">
+        <div className="p-6 space-y-4">
+          {/* Prominent Error Banner when AppID/Secret unconfigured or request fails */}
+          {errorMsg && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <div className="leading-relaxed font-medium">{errorMsg}</div>
+            </div>
+          )}
+
           {step === 'success' ? (
             <div className="py-8 flex flex-col items-center text-center space-y-3">
               <div className="w-14 h-14 bg-green-100 text-green-600 rounded-full flex items-center justify-center animate-bounce">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
-              <h3 className="font-serif font-bold text-base text-[#1A1A1A]">登录成功！</h3>
-              <p className="text-xs text-gray-500">正在进入家族修谱空间...</p>
+              <h3 className="font-serif font-bold text-base text-[#1A1A1A]">微信真实授权成功！</h3>
+              <p className="text-xs text-gray-500">已保存 Token 并建立安全身份认证...</p>
             </div>
-          ) : loginMode === 'phone' ? (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">手机号码</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-gray-400 font-medium">+86</span>
-                  <input
-                    type="tel"
-                    maxLength={11}
-                    placeholder="请输入11位手机号"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full pl-12 pr-3 py-2 text-sm bg-white border border-[#D9CDB8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8B5A2B]"
-                  />
+          ) : loginMode === 'wechat' ? (
+            <div className="space-y-4">
+              <div className="p-4 bg-white border border-[#E8DFD1] rounded-xl flex flex-col items-center text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-[#07C160]/10 text-[#07C160] flex items-center justify-center">
+                  <ShieldCheck className="w-7 h-7" />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">短信验证码</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    maxLength={6}
-                    placeholder="请输入验证码 (测试码:8888)"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    className="flex-1 px-3 py-2 text-sm bg-white border border-[#D9CDB8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#8B5A2B]"
-                  />
-                  <button
-                    type="button"
-                    disabled={countdown > 0}
-                    onClick={handleSendCode}
-                    className="px-4 py-2 bg-[#8B5A2B]/10 hover:bg-[#8B5A2B]/20 text-[#8B5A2B] text-xs font-semibold rounded-xl shrink-0 transition-colors disabled:opacity-50"
-                  >
-                    {countdown > 0 ? `${countdown}s 后重试` : '获取验证码'}
-                  </button>
+                <div>
+                  <h4 className="font-serif font-bold text-sm text-[#1A1A1A]">微信静默登录</h4>
+                  <p className="text-xs text-gray-500 mt-1">
+                    系统将调用原生的 <code className="bg-gray-100 px-1 py-0.5 rounded text-[#8B5A2B]">wx.login()</code> 获取临时 code 并向后端换取真实 openid 与 JWT Token
+                  </p>
                 </div>
-              </div>
 
-              <div className="pt-2">
                 <button
-                  type="submit"
-                  className="w-full py-3 bg-gradient-to-r from-[#8B5A2B] to-[#B83B26] text-white font-serif font-bold text-sm rounded-xl shadow-md hover:opacity-95 transition-opacity"
+                  type="button"
+                  disabled={loading}
+                  onClick={handleNativeWxLogin}
+                  className="w-full py-3 bg-[#07C160] hover:bg-[#06ad56] text-white font-serif font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                 >
-                  立即登录 / 注册
+                  {loading ? '正在通信换取 Token...' : '执行真实 wx.login() 静默登录'}
                 </button>
               </div>
 
-              <p className="text-[10px] text-center text-gray-400 mt-2">
-                未注册手机号验证后将自动创建数字族谱账号
-              </p>
-            </form>
-          ) : (
-            <div className="py-4 flex flex-col items-center text-center space-y-4">
-              <div className="p-4 bg-white border-2 border-dashed border-[#D9CDB8] rounded-2xl shadow-xs">
-                <div className="w-40 h-40 bg-gray-50 flex flex-col items-center justify-center rounded-xl text-gray-400 gap-2">
-                  <QrCode className="w-20 h-20 text-[#07C160]" />
-                  <span className="text-[11px] font-medium text-gray-600">请使用微信扫一扫登录</span>
+              {/* Web Environment Debug Input */}
+              <div className="p-3 bg-amber-50/50 border border-amber-200/60 rounded-xl space-y-2 text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Web/H5 环境 Code 调试通道:</span>
                 </div>
+                <input
+                  type="text"
+                  placeholder="请输入真实的 wx.login() code"
+                  value={wxCode}
+                  onChange={(e) => setWxCode(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-[#D9CDB8] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#8B5A2B]"
+                />
               </div>
-              <p className="text-xs text-gray-500">支持微信授权一键绑定宗亲档案</p>
-              <button
-                type="button"
-                onClick={handleWeChatSimulate}
-                className="w-full py-3 bg-[#07C160] hover:bg-[#06ad56] text-white font-serif font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-colors"
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>模拟微信一键授权登录</span>
-              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-4 bg-white border border-[#E8DFD1] rounded-xl flex flex-col items-center text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-[#8B5A2B]/10 text-[#8B5A2B] flex items-center justify-center">
+                  <Smartphone className="w-7 h-7" />
+                </div>
+                <div>
+                  <h4 className="font-serif font-bold text-sm text-[#1A1A1A]">微信手机号组件授权</h4>
+                  <p className="text-xs text-gray-500 mt-1">
+                    使用微信官方组件按钮获取加密 code，由后端解密出真实 11 位手机号码
+                  </p>
+                </div>
+
+                {/* WeChat Official Component Button */}
+                {/* Note: React renders open-type and bindgetphonenumber attributes for WeChat Mini Program runtime */}
+                <button
+                  type="button"
+                  {...({
+                    'open-type': 'getPhoneNumber',
+                    bindgetphonenumber: handleGetPhoneNumber,
+                  } as any)}
+                  onClick={handleGetPhoneNumber}
+                  disabled={loading}
+                  className="w-full py-3 bg-gradient-to-r from-[#8B5A2B] to-[#B83B26] text-white font-serif font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 hover:opacity-95 transition-opacity disabled:opacity-50"
+                >
+                  {loading ? '正在解密手机号...' : '授权微信绑定真实手机号'}
+                </button>
+              </div>
+
+              {/* Web Environment Phone Code Manual Submission */}
+              <form onSubmit={handleWebPhoneCodeSubmit} className="p-3 bg-amber-50/50 border border-amber-200/60 rounded-xl space-y-2 text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Web/H5 环境 getPhoneNumber Code 调试通道:</span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="粘贴 getPhoneNumber code"
+                    value={phoneCode}
+                    onChange={(e) => setPhoneCode(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-white border border-[#D9CDB8] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#8B5A2B]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-3 py-2 bg-[#8B5A2B] text-white font-bold text-xs rounded-lg shrink-0"
+                  >
+                    验证
+                  </button>
+                </div>
+              </form>
             </div>
           )}
+
+          <div className="text-[10px] text-gray-400 text-center leading-normal">
+            微信开放平台认证协议 | 后端自动从环境变量读取 AppID 与 Secret
+          </div>
         </div>
       </div>
     </div>

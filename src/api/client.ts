@@ -7,13 +7,41 @@ import {
   User,
 } from '../types/genealogy';
 
+// Token Cache Helper
+export function getStoredToken(): string | null {
+  try {
+    if (typeof (window as any).wx !== 'undefined' && (window as any).wx.getStorageSync) {
+      return (window as any).wx.getStorageSync('token');
+    }
+  } catch (e) {}
+  if (typeof localStorage !== 'undefined') {
+    return localStorage.getItem('token');
+  }
+  return null;
+}
+
+export function saveStoredToken(token: string) {
+  try {
+    if (typeof (window as any).wx !== 'undefined' && (window as any).wx.setStorageSync) {
+      (window as any).wx.setStorageSync('token', token);
+    }
+  } catch (e) {}
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('token', token);
+  }
+}
+
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options?.headers as Record<string, string>),
+  };
+
   const res = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
     ...options,
+    headers,
   });
   const data = await res.json();
   if (!res.ok || !data.success) {
@@ -127,5 +155,16 @@ export const api = {
     fetchJson<{ success: boolean; text: string; members: any[] }>('/api/ai/parse-photo', {
       method: 'POST',
       body: JSON.stringify({ imageBase64 }),
+    }),
+  // WeChat Real Authentication
+  wechatLogin: (code: string) =>
+    fetchJson<{ success: boolean; token: string; openid: string; user: User }>('/api/wechat/login', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+  wechatGetPhone: (code: string, openid?: string) =>
+    fetchJson<{ success: boolean; phone: string; user: User }>('/api/wechat/get-phone', {
+      method: 'POST',
+      body: JSON.stringify({ code, openid }),
     }),
 };

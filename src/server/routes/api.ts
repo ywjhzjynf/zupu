@@ -6,8 +6,35 @@ import { FamilyMember, ParentChildRelation, SpouseRelation } from '../../types/g
 
 export const apiRouter = Router();
 
+function getWeChatConfig() {
+  const appId = process.env.WECHAT_APP_ID;
+  const appSecret = process.env.WECHAT_APP_SECRET;
+
+  if (
+    !appId ||
+    !appSecret ||
+    appId.includes('YOUR_') ||
+    appSecret.includes('YOUR_') ||
+    appId.trim() === '' ||
+    appSecret.trim() === ''
+  ) {
+    return null;
+  }
+  return { appId: appId.trim(), appSecret: appSecret.trim() };
+}
+
 // 1. User & Current Family Auth Context
 apiRouter.get('/user/me', (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    const foundUser = db.users.find((u: any) => u.token === token || token.includes(u.id));
+    if (foundUser) {
+      res.json({ success: true, user: foundUser });
+      return;
+    }
+  }
+
   const user = db.users[0] || {
     id: 'usr_root',
     openid: 'wx_12345',
@@ -17,6 +44,151 @@ apiRouter.get('/user/me', (req: Request, res: Response) => {
     boundMemberId: 'mem_li_ming',
   };
   res.json({ success: true, user });
+});
+
+// Real WeChat Silent Login Endpoint
+apiRouter.post('/wechat/login', async (req: Request, res: Response) => {
+  try {
+    const config = getWeChatConfig();
+    if (!config) {
+      res.status(400).json({
+        success: false,
+        code: 'WECHAT_CONFIG_MISSING',
+        message: '未配置真实微信小程序 AppID 与 AppSecret，请在后端 .env 中配置 WECHAT_APP_ID 与 WECHAT_APP_SECRET',
+      });
+      return;
+    }
+
+    const { code } = req.body;
+    if (!code) {
+      res.status(400).json({ success: false, message: '缺少微信 wx.login 返回的 code 凭证' });
+      return;
+    }
+
+    // Call official WeChat API: sns/jscode2session
+    const wxUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${encodeURIComponent(config.appId)}&secret=${encodeURIComponent(config.appSecret)}&js_code=${encodeURIComponent(code)}&grant_type=authorization_code`;
+    const wxRes = await fetch(wxUrl);
+    const wxData = await wxRes.json();
+
+    if (wxData.errcode && wxData.errcode !== 0) {
+      res.status(400).json({
+        success: false,
+        code: `WECHAT_API_ERROR_${wxData.errcode}`,
+        message: `微信接口换取 Session 失败: [${wxData.errcode}] ${wxData.errmsg || 'code无效或与AppID/Secret不匹配'}`,
+      });
+      return;
+    }
+
+    const { openid, session_key, unionid } = wxData;
+
+    let user = db.users.find((u) => u.openid === openid);
+    if (!user) {
+      user = {
+        id: `usr_wx_${Date.now()}`,
+        openid,
+        unionid,
+        nickname: `微信宗亲_${openid.slice(-4)}`,
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        currentFamilyId: db.families[0]?.id || 'fam_longxi_li',
+      };
+      db.users.push(user);
+    }
+
+    const token = `wx_jwt_${user.id}_${Date.now()}`;
+    (user as any).sessionKey = session_key;
+    (user as any).token = token;
+
+    res.json({
+      success: true,
+      token,
+      openid,
+      user,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: `后端微信静默登录处理异常: ${err.message}` });
+  }
+});
+
+// Real WeChat Phone Authorization Endpoint
+apiRouter.post('/wechat/get-phone', async (req: Request, res: Response) => {
+  try {
+    const config = getWeChatConfig();
+    if (!config) {
+      res.status(400).json({
+        success: false,
+        code: 'WECHAT_CONFIG_MISSING',
+        message: '未配置真实微信小程序 AppID 与 AppSecret，请在后端 .env 中配置 WECHAT_APP_ID 与 WECHAT_APP_SECRET',
+      });
+      return;
+    }
+
+    const { code, openid } = req.body;
+    if (!code) {
+      res.status(400).json({ success: false, message: '缺少 getPhoneNumber 返回的手机号授权 code' });
+      return;
+    }
+
+    // Step 1: Get Access Token
+    const tokenUrl = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${encodeURIComponent(config.appId)}&secret=${encodeURIComponent(config.appSecret)}`;
+    const tokenRes = await fetch(tokenUrl);
+    const tokenData = await tokenRes.json();
+
+    if (tokenData.errcode && tokenData.errcode !== 0) {
+      res.status(400).json({
+        success: false,
+        message: `获取微信 Access Token 失败: [${tokenData.errcode}] ${tokenData.errmsg}`,
+      });
+      return;
+    }
+
+    const accessToken = tokenData.access_token;
+
+    // Step 2: Call wxa/business/getuserphonenumber
+    const phoneUrl = `https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${accessToken}`;
+    const phoneRes = await fetch(phoneUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+    const phoneData = await phoneRes.json();
+
+    if (phoneData.errcode && phoneData.errcode !== 0) {
+      res.status(400).json({
+        success: false,
+        message: `微信解密真实手机号失败: [${phoneData.errcode}] ${phoneData.errmsg || '授权 code 已过期或失效'}`,
+      });
+      return;
+    }
+
+    const realPhoneNumber = phoneData.phone_info?.phoneNumber || phoneData.phone_info?.purePhoneNumber;
+
+    if (!realPhoneNumber) {
+      res.status(400).json({ success: false, message: '微信未能返回有效的手机号码' });
+      return;
+    }
+
+    let user = openid ? db.users.find((u) => u.openid === openid) : db.users[0];
+    if (user) {
+      user.phone = realPhoneNumber;
+    } else {
+      user = {
+        id: `usr_wx_${Date.now()}`,
+        nickname: `手机用户_${realPhoneNumber.slice(-4)}`,
+        phone: realPhoneNumber,
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        currentFamilyId: db.families[0]?.id || 'fam_longxi_li',
+      };
+      db.users.push(user);
+    }
+
+    res.json({
+      success: true,
+      phone: realPhoneNumber,
+      user,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: `后端微信手机号解密异常: ${err.message}` });
+  }
 });
 
 apiRouter.post('/user/switch-family', (req: Request, res: Response) => {
