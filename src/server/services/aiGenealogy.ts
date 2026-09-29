@@ -57,8 +57,8 @@ export async function askAIGenealogyAssistant(
   const genOrdersContext = genOrders.map((g) => `第${g.generationNum}代字辈: "${g.character}" (${g.explanation || ''})`).join('\n');
 
   const prompt = `
-你是一位严谨、典雅的中华传统家族「数字族谱 AI 助手」。
-请基于以下【真实家族档案】数据回答用户提问：
+你是一位全能的智能助手兼中华传统家族「数字族谱 AI 专家」。
+你可以回答用户的任何通用问题（如日常对话、诗词歌赋、文案创作、知识问答、编程协助等），同时如果问题涉及家族档案、先祖生平、亲属关系、字辈家训，请结合以下【真实家族档案】数据进行严谨、温暖的解答：
 
 【家族概况】:
 名称: ${family.name}
@@ -83,7 +83,7 @@ ${storiesContext}
 
 用户提问: "${userQuestion}"
 
-请给予详尽、准确、温暖的解答：
+请给予详尽、准确、温暖且全能的解答：
 `;
 
   try {
@@ -92,7 +92,14 @@ ${storiesContext}
       return generateFallbackAnswer(userQuestion, family, members, stories);
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
       contents: prompt,
@@ -278,14 +285,25 @@ function generateFallbackAnswer(
   members: any[],
   stories: any[]
 ): string {
+  // Check if asking about a specific member
+  const matchedMember = members.find((m) => userQuestion.includes(m.name));
+  if (matchedMember) {
+    return `【档案检索：${matchedMember.name}】\n- 性别：${matchedMember.gender === 'male' ? '男' : '女'}\n- 辈分：第${matchedMember.generationNum}代 (${matchedMember.generationChar || '无'}字辈)\n- 生卒：${matchedMember.birthDate || '不详'} (${matchedMember.isDeceased ? '已故' : '健在'})\n- 居住地：${matchedMember.livingPlace || '未知'}\n- 生平传记：${matchedMember.biography || '暂无详细记载'}`;
+  }
+
+  if (userQuestion.includes('妈妈') || userQuestion.includes('母亲') || userQuestion.includes('母亲是谁')) {
+    const females = members.filter(m => m.gender === 'female');
+    return `【家族女性长辈与母亲档案】\n当前家族中共登记 ${females.length} 位女性宗亲：\n${females.map(m => `• ${m.name} (第${m.generationNum}代，${m.livingPlace || '居住地不详'})`).join('\n') || '暂无女性宗亲记录'}`;
+  }
+
   if (userQuestion.includes('字辈') || userQuestion.includes('辈分')) {
-    return `【${family.name} 字辈分析】\n本家族字辈按代排列依次为：德、维、新、明、文、昌。每一代字辈承载着始祖对后代的谆谆教诲。`;
+    return `【${family.name} 字辈谱系】\n本家族字辈按代排列依次为：德、维、新、明、文、昌。每一代字辈承载着始祖对后代的谆谆教诲。`;
   }
   if (userQuestion.includes('故事') || userQuestion.includes('家训')) {
     const motto = stories.find((s) => s.category === 'motto');
     return motto
       ? `【家族家训】\n《${motto.title}》:\n${motto.content}`
-      : `【家族概况】\n${family.summary}`;
+      : `【家族概况】\n${family.summary || '世代绵延，崇德向善。'}`;
   }
-  return `【${family.name} 族谱信息】\n目前家族共登记 ${members.length} 位成员，记载世系 5 代。如需精确亲属称谓或生平润色，可在成员详情中查阅。`;
+  return `【${family.name} 族谱信息】\n关于「${userQuestion}」，在当前已登记的 ${members.length} 位成员及 5 代世系中，建议您在左侧“目录”或“世系图”中查阅对应宗亲的详细档案。`;
 }

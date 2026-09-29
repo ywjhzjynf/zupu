@@ -13,6 +13,7 @@ import { PhotoUploadModal } from './components/photo/PhotoUploadModal';
 import { AIAssistantDrawer } from './components/ai/AIAssistantDrawer';
 import { ExportGenealogyModal } from './components/export/ExportGenealogyModal';
 import { AIBatchEntryModal } from './components/member/AIBatchEntryModal';
+import { PhoneLoginModal } from './components/common/PhoneLoginModal';
 
 import { HomeView } from './views/HomeView';
 import { GenealogyView } from './views/GenealogyView';
@@ -48,6 +49,7 @@ export default function App() {
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isAIBatchOpen, setIsAIBatchOpen] = useState(false);
+  const [isPhoneLoginOpen, setIsPhoneLoginOpen] = useState(false);
 
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
   const [memberToEdit, setMemberToEdit] = useState<FamilyMember | null>(null);
@@ -213,6 +215,7 @@ export default function App() {
         onOpenFamilySwitch={() => setIsFamilySwitchOpen(true)}
         onOpenInvite={() => setIsInviteOpen(true)}
         onToggleAIDrawer={() => setIsAIDrawerOpen(true)}
+        onOpenLogin={() => setIsPhoneLoginOpen(true)}
         boundMemberName={boundMemberObj?.name}
       />
 
@@ -415,6 +418,14 @@ export default function App() {
         onClose={() => setIsAIBatchOpen(false)}
         familyId={currentFamily?.id || ''}
         onBatchImportDone={() => loadFamilySpace(currentFamily?.id || '')}
+      />
+
+      <PhoneLoginModal
+        isOpen={isPhoneLoginOpen}
+        onClose={() => setIsPhoneLoginOpen(false)}
+        onLoginSuccess={(loggedInUser) => {
+          setUser(loggedInUser);
+        }}
       />
     </div>
   );

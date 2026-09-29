@@ -7,6 +7,7 @@ interface HeaderProps {
   onOpenFamilySwitch: () => void;
   onOpenInvite: () => void;
   onToggleAIDrawer: () => void;
+  onOpenLogin: () => void;
   boundMemberName?: string;
 }
 
@@ -15,6 +16,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenFamilySwitch,
   onOpenInvite,
   onToggleAIDrawer,
+  onOpenLogin,
   boundMemberName,
 }) => {
   return (
@@ -45,6 +47,14 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right Action Icons */}
       <div className="flex items-center gap-2">
+        <button
+          onClick={onOpenLogin}
+          className="px-2.5 py-1.5 bg-[#8B5A2B]/10 hover:bg-[#8B5A2B]/20 text-[#8B5A2B] rounded-lg transition-colors text-xs font-semibold flex items-center gap-1"
+          title="手机/微信登录"
+        >
+          <span>手机/微信登录</span>
+        </button>
+
         <button
           onClick={onOpenInvite}
           className="p-2 text-[#8B5A2B] hover:bg-[#8B5A2B]/10 rounded-full transition-colors flex items-center gap-1 text-xs font-medium"
