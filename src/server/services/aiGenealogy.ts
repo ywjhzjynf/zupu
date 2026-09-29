@@ -94,7 +94,7 @@ ${storiesContext}
 
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents: prompt,
     });
 
@@ -138,7 +138,7 @@ export async function parseAIGenealogyText(text: string): Promise<any[]> {
 `;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash',
         contents: prompt,
       });
 
@@ -189,7 +189,7 @@ export async function parseAIGenealogyPhoto(base64Data: string): Promise<{ text:
 `;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash',
         contents: [
           prompt,
           {
